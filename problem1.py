@@ -81,7 +81,8 @@ def compute_a(z):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-    a = np.exp(z)
+    # subtract the max so np.exp never overflows and clip very negative values so np.exp never underflows
+    a = np.exp(np.clip(z - np.max(z), -700, 0))
     a = a / np.sum(a)
 
     #########################################
@@ -100,7 +101,9 @@ def compute_L(a, y):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-    L = -np.log(a[y])
+    a_y = float(np.squeeze(a[y]))
+    # log(0) is -inf, so make  a very large loss instead
+    L = float(-np.log(a_y)) if a_y > 0 else 10000000
     #########################################
     return L
 
@@ -121,7 +124,9 @@ def forward(x, y, W, b):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    z = compute_z(x, W, b)
+    a = compute_a(z)
+    L = compute_L(a, y)
     #########################################
     return z, a, L
 
@@ -144,7 +149,9 @@ def compute_dL_da(a, y):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    dL_da = np.zeros_like(a)
+    # clip a[y] away from 0 so we don't get infinity when dividing by zero
+    dL_da[y] = -1 / max(float(np.squeeze(a[y])), 0.0000001)
     #########################################
     return dL_da
 
@@ -163,7 +170,8 @@ def compute_da_dz(a):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    a = np.ravel(a)
+    da_dz = np.diag(a) - np.outer(a, a)
     #########################################
     return da_dz
 
@@ -182,7 +190,8 @@ def compute_dz_dW(x, c):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    # ravel so elemetns are in a single row, then tile to repeat the row c times
+    dz_dW = np.tile(np.ravel(x), (c, 1))
     #########################################
     return dz_dW
 
@@ -200,7 +209,7 @@ def compute_dz_db(c):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    dz_db = np.ones(c)
     #########################################
     return dz_db
 
@@ -230,7 +239,11 @@ def backward(x, y, a):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    dL_da = compute_dL_da(a, y)
+    da_dz = compute_da_dz(a)
+    c = a.shape[0]
+    dz_dW = compute_dz_dW(x, c)
+    dz_db = compute_dz_db(c)
     #########################################
     return dL_da, da_dz, dz_dW, dz_db
 
@@ -250,7 +263,7 @@ def compute_dL_dz(dL_da, da_dz):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    dL_dz = da_dz.T @ dL_da
     #########################################
     return dL_dz
 
@@ -271,7 +284,7 @@ def compute_dL_dW(dL_dz, dz_dW):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    dL_dW = np.outer(dL_dz, dz_dW[0])
     #########################################
     return dL_dW
 
@@ -292,7 +305,7 @@ def compute_dL_db(dL_dz, dz_db):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    dL_db = np.ravel(dL_dz) * dz_db
     #########################################
     return dL_db
 
@@ -317,7 +330,7 @@ def update_W(W, dL_dW, alpha=0.001):
     """
     #########################################
     ## INSERT YOUR CODE HERE
-
+    W -= alpha * dL_dW
     #########################################
     return W
 
@@ -338,7 +351,7 @@ def update_b(b, dL_db, alpha=0.001):
 
     #########################################
     ## INSERT YOUR CODE HERE
-
+    b -= alpha * dL_db
     #########################################
     return b
 
@@ -372,7 +385,13 @@ def train(X, Y, alpha=0.01, n_epoch=100):
             print("for loop")
             #########################################
             ## INSERT YOUR CODE HERE
-
+            z, a, L = forward(x, y, W, b)
+            dL_da, da_dz, dz_dW, dz_db = backward(x, y, a)
+            dL_dz = compute_dL_dz(dL_da, da_dz)
+            dL_dW = compute_dL_dW(dL_dz, dz_dW)
+            dL_db = compute_dL_db(dL_dz, dz_db)
+            W = update_W(W, dL_dW, alpha)
+            b = update_b(b, dL_db, alpha)
             #########################################
     return W, b
 
@@ -398,7 +417,10 @@ def predict(Xtest, W, b):
         print("for loop")
         #########################################
         ## INSERT YOUR CODE HERE
-
+        z = compute_z(x, W, b)
+        a = compute_a(z)
+        Y[i] = np.argmax(a)
+        P[i] = a
         #########################################
     return Y, P
 
